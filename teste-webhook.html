@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Teste do Webhook — Terra & Luz Atelier</title>
+<style>
+  :root{
+    --ink:#2A2A1E; --text:#544F3C; --cream:#FBF8F0; --cream-2:#F3EEDE;
+    --olive:#433D22; --gold:#C69A3E; --line:rgba(42,42,30,0.14);
+  }
+  *{box-sizing:border-box;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    background:var(--cream); color:var(--text); margin:0; padding:24px;
+    line-height:1.6;
+  }
+  .wrap{max-width:640px; margin:0 auto;}
+  h1{font-size:1.4rem; color:var(--ink); margin-bottom:6px;}
+  .subtitle{font-size:0.9rem; color:var(--text); opacity:0.8; margin-bottom:28px;}
+  .step{background:#fff; border:1px solid var(--line); border-radius:10px; padding:20px; margin-bottom:18px;}
+  .step-title{font-weight:700; color:var(--ink); margin-bottom:10px; font-size:0.95rem;}
+  label{display:block; font-size:0.82rem; font-weight:600; color:var(--ink); margin-bottom:6px; margin-top:14px;}
+  label:first-of-type{margin-top:0;}
+  input[type=text], textarea{
+    width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px;
+    font-family:'SF Mono',Consolas,monospace; font-size:0.82rem; background:var(--cream-2);
+    color:var(--ink);
+  }
+  textarea{min-height:110px; resize:vertical;}
+  button{
+    margin-top:16px; background:var(--olive); color:var(--cream); border:none;
+    padding:12px 22px; border-radius:8px; font-size:0.95rem; font-weight:600;
+    cursor:pointer; width:100%;
+  }
+  button:disabled{opacity:0.6; cursor:default;}
+  button:hover:not(:disabled){opacity:0.92;}
+  #resultado{margin-top:18px; display:none;}
+  .result-box{
+    border-radius:8px; padding:16px; font-family:'SF Mono',Consolas,monospace;
+    font-size:0.82rem; white-space:pre-wrap; word-break:break-word;
+  }
+  .result-ok{background:#e8f5e9; border:1px solid #66bb6a; color:#1b5e20;}
+  .result-erro{background:#ffebee; border:1px solid #ef5350; color:#b71c1c;}
+  .result-title{font-weight:700; margin-bottom:8px; font-family:-apple-system,sans-serif;}
+  .hint{font-size:0.82rem; color:var(--text); opacity:0.85; margin-top:14px; padding-top:14px; border-top:1px dashed var(--line);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Teste do Webhook</h1>
+  <div class="subtitle">Testa, direto do seu navegador, se o endereço do webhook aceita uma chamada de fora — exatamente como a InfinitePay faria. Sem terminal, sem instalar nada.</div>
+
+  <div class="step">
+    <div class="step-title">Passo 1 — Cole a URL completa do webhook</div>
+    <label>Pegue essa URL rodando esta consulta no SQL Editor do Supabase e copiando o resultado:</label>
+    <textarea readonly style="min-height:70px; background:var(--cream); font-size:0.75rem;">select request_payload->>'webhook_url' as webhook_url_completa
+from public.infinitepay_api_logs
+where order_id = 'a3da8214-1864-4c4a-afd3-044969bb48da'
+order by created_at desc
+limit 1;</textarea>
+    <label for="url">Cole aqui o valor que a consulta retornou (com o "?apikey=..." no final):</label>
+    <input type="text" id="url" placeholder="https://clmmicdygvyukxesvcrx.supabase.co/rest/v1/rpc/infinitepay_webhook_636a570c9bb44370aa11ce188dff7902?apikey=...">
+  </div>
+
+  <div class="step">
+    <div class="step-title">Passo 2 — Corpo do teste (já preenchido, não precisa mexer)</div>
+    <textarea id="body">{"order_nsu":"a3da8214-1864-4c4a-afd3-044969bb48da","paid_amount":8990,"transaction_nsu":"teste-navegador","receipt_url":"https://exemplo.com/recibo"}</textarea>
+  </div>
+
+  <div class="step">
+    <div class="step-title">Passo 3 — Envie o teste</div>
+    <button id="btnTestar" onclick="testarWebhook()">Testar Webhook</button>
+
+    <div id="resultado"></div>
+  </div>
+
+  <div class="hint" id="explicacao" style="display:none;"></div>
+</div>
+
+<script>
+async function testarWebhook(){
+  const url = document.getElementById('url').value.trim();
+  const bodyText = document.getElementById('body').value.trim();
+  const btn = document.getElementById('btnTestar');
+  const resultado = document.getElementById('resultado');
+  const explicacao = document.getElementById('explicacao');
+
+  if(!url){
+    alert('Cole a URL do webhook antes de testar (Passo 1).');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Testando…';
+  resultado.style.display = 'none';
+  explicacao.style.display = 'none';
+
+  const inicio = performance.now();
+  try{
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: bodyText
+    });
+    const tempoMs = Math.round(performance.now() - inicio);
+    const textoResposta = await res.text();
+
+    const ok = res.status === 200;
+    resultado.style.display = 'block';
+    resultado.innerHTML = `
+      <div class="result-box ${ok ? 'result-ok' : 'result-erro'}">
+        <div class="result-title">${ok ? '✅ Sucesso' : '⚠️ Resposta com erro'} — Status HTTP: ${res.status}</div>
+        Tempo de resposta: ${tempoMs}ms
+
+Corpo da resposta:
+${textoResposta}
+      </div>`;
+
+    explicacao.style.display = 'block';
+    if(ok){
+      explicacao.innerHTML = '<strong>O que isso significa:</strong> o endpoint aceita chamadas de fora normalmente. Isso aponta para a causa estar do lado da InfinitePay (não estar disparando a chamada, ou usando uma URL diferente) — vale abrir o chamado com o suporte deles a partir daqui.';
+    } else if(res.status === 401 || res.status === 403){
+      explicacao.innerHTML = '<strong>O que isso significa:</strong> a chamada está sendo recusada por autenticação/permissão, antes de chegar na nossa função. Me manda esse resultado (print da tela já serve) que eu ajusto isso do lado do Supabase.';
+    } else if(res.status === 404){
+      explicacao.innerHTML = '<strong>O que isso significa:</strong> a rota não foi encontrada — pode ser um erro na URL copiada, ou algo no cadastro da função no Supabase. Me manda esse resultado.';
+    } else {
+      explicacao.innerHTML = '<strong>O que isso significa:</strong> algo inesperado aconteceu. Me manda esse resultado (print da tela já serve) que eu identifico a causa.';
+    }
+  }catch(err){
+    resultado.style.display = 'block';
+    resultado.innerHTML = `
+      <div class="result-box result-erro">
+        <div class="result-title">❌ Não foi possível completar a chamada</div>
+        Erro: ${err.message}
+      </div>`;
+    explicacao.style.display = 'block';
+    explicacao.innerHTML = '<strong>O que isso significa:</strong> o navegador nem conseguiu completar a chamada (rede, ou a URL bloqueando chamadas de outros sites, algo chamado CORS). Me manda esse resultado (print da tela já serve) — nesse caso pode ser necessário o teste real do terminal/curl, ou pedir para alguém técnico rodar por você.';
+  }finally{
+    btn.disabled = false;
+    btn.textContent = 'Testar Webhook';
+  }
+}
+</script>
+</body>
+</html>
