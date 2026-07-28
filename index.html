@@ -1065,7 +1065,6 @@ const EMAIL_CONTACT = "atelierterraeluz@gmail.com";
   abaixo como último recurso, mas nesse caso a confirmação
   automática por webhook não se aplica a esse pedido específico.
 */
-const INFINITEPAY_CHECKOUT_URL = "https://checkout.infinitepay.io/"; // link de reserva, usado só se o Supabase falhar
 
 /*
   INTEGRAÇÃO COM SUPABASE (banco de pedidos + painel administrativo)
@@ -1504,10 +1503,13 @@ async function checkoutInfinitePay(){
   if(!orderId){
     // Não foi possível registrar o pedido no Supabase (banco não
     // configurado ou indisponível). Sem um pedido salvo não há como
-    // o webhook confirmar o pagamento automaticamente depois, então
-    // como último recurso usamos o link fixo de checkout.
-    showToast('Redirecionando para o pagamento…');
-    setTimeout(()=> window.open(INFINITEPAY_CHECKOUT_URL, '_blank'), 600);
+    // o webhook confirmar o pagamento automaticamente depois. Antes,
+    // esse caso abria um link fixo de checkout que estava incompleto
+    // (sem o handle da loja) e sempre resultava em 404. Agora, em vez
+    // de arriscar mandar o cliente para uma página quebrada, avisamos
+    // e sugerimos o WhatsApp como alternativa segura.
+    console.error('Falha ao registrar pedido no Supabase antes do pagamento InfinitePay.');
+    alert('Não conseguimos registrar seu pedido agora. Por favor, finalize sua compra pelo WhatsApp para não perder o desconto ou a disponibilidade do produto.');
     return;
   }
 
